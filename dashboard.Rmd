@@ -15,14 +15,16 @@ library(googlesheets4)
 library(dplyr)
 library(ggplot2)
 library(shiny)
+library(DT)
+library(tidyr)
 library(plotly)
 library(flexdashboard)
 dta <- readRDS(file="data/population.RData")
-
+population <- readRDS(file="population.RData")
 dta_plot <- dta %>% mutate(year=factor(year))
 ```
 
-About
+About Sudan
 =====
 
 
@@ -53,7 +55,7 @@ Column {data-width=300}
 -----------------------------------------------------------------------
 ### Data on inhabitants
 ```{r}
-  data <- readRDS(file="data/sudan.RData")
+  data <- readRDS(file="data/sudan2.RData")
   knitr::kable(data[1:dim(data)[1],c("sex", "year", "height", "weight")])
 
 ```
@@ -122,6 +124,7 @@ shinyApp(ui = ui, server = server)
 
 ```
 
+
 Column {data-width=350}
 -----------------------------------------------------------------------
 ### Density Plot
@@ -144,8 +147,7 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   output$densityPlot <- renderPlotly({
-    data_to_plot <- dta_plot
-    p <- ggplot(data = data_to_plot, aes_string(x = input$variable, fill = input$group)) +
+    p <- ggplot(data = dta_plot, aes(x = input$variable, fill = input$group)) +
       geom_density(alpha = 0.6) +
       labs(title = paste("Density Plot of", input$variable, "by", input$group))
   })
@@ -154,36 +156,117 @@ server <- function(input, output) {
 
 
 ```
-
-Test
-======
-
+### Violin Plot
 ```{r}
 ui <- fluidPage(
-  titlePanel("Data Visualization App"),
-  sidebarLayout(
-    sidebarPanel(
-      checkboxGroupInput("yearInput", "Select Year:", 
-                         choices = unique(dta_plot$year),
-                         selected = unique(dta_plot$year))
-    ),
-    mainPanel(
-      plotOutput("selectedPlot")
-    )
+  titlePanel("Violin Plot of Weight Distribution by Sex"),
+  mainPanel(
+    width = 350,
+    height = 1,
+    plotOutput("violinPlot")
   )
 )
 
-# Define server logic
 server <- function(input, output) {
-  output$selectedPlot <- renderPlot({
-    filteredData <- dta_plot %>% filter(year %in% input$yearInput)
-    # Determine which plot to render based on the user's selection
-      ggplot(data = filteredData, aes(x = height, y = weight, color = sex))+
-        geom_point() +
-        labs(title = "Scatter Plot of Height vs. Weight by Sex", x = "Height", y = "Weight")
+  output$violinPlot <- renderPlot({
+    ggplot(data = dta_plot, aes(x = interaction(sex, year), y = weight, fill = interaction(sex, year))) +
+      geom_violin(trim = F) +
+      geom_boxplot(width = 0.1, fill = "white")+
+      scale_fill_brewer(palette="Set2", name="Sex, Year")+
+      labs(x="Sex, year",y="Weight")
   })
 }
 
-# Run the application 
 shinyApp(ui = ui, server = server)
 ```
+Statistics
+======
+
+Column {data-width=400}
+-----------------------------------------------------------------------
+### Summary of BMIs in different countries
+
+```{r}
+
+summary_stats <- population %>%
+  group_by(country, year, sex) %>%
+  summarise(
+    mean_bmi = round(mean(bmi, na.rm = TRUE),2),
+    median_bmi = round(median(bmi, na.rm = TRUE),2),
+    sd_bmi = round(sd(bmi, na.rm = TRUE),2),
+    min_bmi = min(bmi, na.rm = TRUE),
+    max_bmi = max(bmi, na.rm = TRUE)
+  )
+  ui <- fluidPage(
+    titlePanel("BMI Statistics by Country, Year, and Sex"),
+    DTOutput("statsTable"),style="height:500px;"
+  )
+  
+  server <- function(input, output) {
+    output$statsTable <- renderDT({
+      datatable(summary_stats,
+                options = list(pageLength = 44,
+                                              scrollY = "600px", scrollCollapse = TRUE),
+                      colnames = c("Country", "Year", "Sex", "Mean BMI", "Median BMI","SD BMI","Minimum   BMI","Maximum BMI"),
+                filter = 'top')
+
+    })
+  }
+  
+  shinyApp(ui = ui, server = server)
+```
+Column {data-width=350}
+-----------------------------------------------------------------------
+### Dumbbell plot
+```{r}
+bmi_data <- population %>%
+  filter(year %in% c(1880, 1980)) %>%
+  group_by(country, year) %>%
+  summarise(mean_bmi = mean(bmi, na.rm = TRUE), .groups = "drop") %>%
+  spread(key = year, value = mean_bmi) %>%
+  rename(bmi_1880 = `1880`, bmi_1980 = `1980`) %>%
+  drop_na()
+ui <- fluidPage(
+  titlePanel("Dumbbell Plot of BMI Changes"),
+  mainPanel(
+    plotOutput("dumbbellPlot")
+  )
+)
+
+server <- function(input, output) {
+  output$dumbbellPlot <- renderPlot({
+    ggplot(bmi_data, aes(y = country)) +
+      geom_segment(
+        size=5,
+        aes(x = bmi_1880, xend = bmi_1980, yend = country),
+        lineend = "round",
+        alpha = 0.4
+        ) +
+      geom_point(
+        aes(x = bmi_1880),
+             color = "orange",
+             size = 5,
+             alpha = 0.9,
+        ) +
+            geom_point(
+        aes(x = bmi_1980),
+             color = "blue",
+             size = 5,
+             alpha = 0.9,
+        ) +
+      labs(x = "Mean BMI", y = "Country", title = "Changes in Mean BMI from 1880 to 1980",
+           subtitle = "Comparison by Sex") +
+      theme(legend.position = "bottom")
+  })
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+<strong>BMI</strong> is a measure of body fat based on height and weight that applies to adult men and women.
+<p>BMI below 18, 5 -> underweight,</p>
+<p>BMI 18,5-25 -> normal weight,</p>
+<p>BMI 25-30 -> overweight,</p>
+<p>BMI 30-35 -> 1st degree obesity,</p>
+<p>BMI 35-40 -> obesity of the second degree,</p>
+<p>BMI above 40 -> obesity of the third degree.</p>

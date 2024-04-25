@@ -1,0 +1,12 @@
+name: dashboard
+title: dashboard
+username: avvo88-bart0omiej-g0uszczak
+account: avvo88-bart0omiej-g0uszczak
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 11865845
+bundleId: 8542033
+url: https://avvo88-bart0omiej-g0uszczak.shinyapps.io/dashboard/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
