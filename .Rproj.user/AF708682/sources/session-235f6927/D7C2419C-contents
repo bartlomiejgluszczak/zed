@@ -1,0 +1,124 @@
+my_mean <- function(x){
+  sum <- 0
+  for(i in x){
+    sum <- sum + i
+  }
+  return(sum / length(x))
+}
+
+vector = rnorm(100,mean=0,sd=1)
+meanResult = my_mean(vector)
+
+my_var <- function(x){
+  m = mean(x)
+  mean((m - x)^2)
+}
+
+varResult = my_var(vector)
+
+my_quantile <- function(x,q){
+  vectorLen = length(x)
+  c <- (vectorLen * q)
+  if(vectorLen %% 2 != 0){
+    return (x[ceiling(c)])
+  }
+  else{
+    s = x[c] + x[c+1]
+    return(s/2)
+  }
+}
+result = my_quantile(c(1,2,3,4,5,6,7,8,9,10),0.5)
+print(result)
+quantile(c(1,2,3,4,5,6,7,8,9,10),0.5)
+
+
+fun <- function(n,seed=NULL,a,b,c,d,year){
+  if(!is.null(seed)) set.seed(seed)
+  
+  x1 <- sample(c(0,1),n,replace=TRUE,prob=c(0.5,0.5))
+  eps  <- rnorm(n,m=0,sd=1)
+  
+  y <- a + (b)*x1 + (1-x1)*7.07*eps+x1*7.59*eps
+  p <- c + (d)*x1 + (1-x1)*7.07*eps+x1*7.59*eps
+  bmi <- p/(y/100)^2
+  sex <- factor(x1)
+  levels(sex) <- c("female","male")
+  res <- data.frame(year = year,sex = sex,country = 'Sudan',weight=round(p,2),height=round(y,2),bmi = round(bmi,2))
+  return (res)
+}
+
+wynik <- fun(1000,31,155.5,9,53.5,5.6,1880)
+wynik2 <- fun(1000,31,160.3,14.2,56.3,7.5,1980)
+wynikKoncowy <- rbind(wynik,wynik2)
+
+saveRDS(wynikKoncowy,file="data/sudan.RData")
+
+# wzrost 1880
+wzrost1880 <- fun(10000,31,155.5,9)
+# wzrost 1980
+wzrost1980 <- fun(10000,31,160.3,14.2)
+# waga 1880
+waga1880 <- fun(10000,31,53.5,5.6)
+# waga 1980
+waga1980 <- fun(1000,31,56.3,7.5)
+
+library(googlesheets4)
+library(dplyr)
+library(plyr)
+library(ggplot2)
+gs4_deauth()
+gs4_auth()
+gs4_auth(email = "s95406@pollub.edu.pl")
+
+ss<-gs4_create("ZADANIE",sheets=list(Intro=NULL, SD=NULL, Overwie=NULL))
+
+class(ss)
+gsheet_key<-"1tmwWrvaCBDx_FlfdGofb415Aw3TswMLmf0TTGHkbb5w"
+#dta<-data.frame(x=rnorm(10),y=rnorm(10))
+
+sheet_add(ss,"SD")
+sheet_write(data,gsheet_key,sheet="SD")
+data<-data.frame(year=wynikKoncowy$year,sex=wynikKoncowy$sex,country="SD",weight = wynikKoncowy$weight,height = wynikKoncowy$height,bmi=wynikKoncowy$bmi)
+
+new_column <- data.frame(z=rnorm(10))
+range_write(gsheet_key,new_column,sheet="Poland",range="C1:E3",col_names=T)
+range_clear(gsheet_key,sheet="SD",range="A1:H10001")
+
+estonia_key<-"1avSO8U1Ny6orfKjdWlftssykJjCQzDCNjF1l6JvAKfk"
+estoniaData <- read_sheet(estonia_key,"EE")
+
+#Gujana
+gujana_key<-"1xeIC0p1SK9OzBDT8FnmnZCTTI79xU8c-qqV5zc2Bvp4"
+gujanaData <- read_sheet(gujana_key,"GC")
+#Serbia
+
+serbia_key<-"1pDZXqkjnPeAdG6opsmXPnW87JE7LOCu3SiEOdI3yiRU"
+serbiaData <- read_sheet(serbia_key,"RS")
+
+
+wynikKoncowy %>% union(gujanaData) -> test
+
+head(serbiaData)
+summary(serbiaData)
+summary(as.factor(serbiaData$sex))
+
+head(gujanaData)
+summary(gujanaData)
+summary(as.factor(gujanaData$sex))
+
+gujanaData %>% sample_n(50) -> tmp1
+serbiaData %>% sample_n(50) -> tmp2
+wynikKoncowy %>% sample_n(50) -> tmp3
+
+test <- union(tmp1,tmp2)
+#wynikKoncowy %>% union(serbiaData) %>% union(gujanaData) -> population
+population <- rbind(tmp1,tmp2,tmp3)
+saveRDS(population,file="data/population.RData")
+
+dta <- readRDS(file="data/population.RData")
+ldply(dta)
+#w miare sprawnie pracować z tymi danymi
+# narysować wykresy i analizować 
+# na nastepnhch zajeciach dashborady shaining flexdashboards 
+
+#dumbleplot

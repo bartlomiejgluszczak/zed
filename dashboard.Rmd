@@ -1,0 +1,189 @@
+---
+title: "Sudan"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    source_code: embed
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+
+library(flexdashboard)
+library(googlesheets4)
+library(dplyr)
+library(ggplot2)
+library(shiny)
+library(plotly)
+library(flexdashboard)
+dta <- readRDS(file="data/population.RData")
+
+dta_plot <- dta %>% mutate(year=factor(year))
+```
+
+About
+=====
+
+
+Column {data-width=300}
+-----------------------------------------------------------------------
+### Brief description
+
+<h1>Sudan</h1>
+<div>
+  <img src="https://upload.wikimedia.org/wikipedia/commons/0/01/Flag_of_Sudan.svg" alt="Sudan" style="width:300px; margin:10px"  />
+</div>
+<div>
+  <p>
+  Sudan, officially known as the Republic of Sudan, is a country in northeastern Africa. It is bordered by Egypt to the north, the Red Sea to the northeast, Eritrea to the east, Ethiopia to the southeast, South Sudan to the south, the Central African Republic to the southwest, Chad to the west, and Libya to the northwest.
+  </p>
+  <p>
+  Sudan has a rich history, with ancient civilizations like the Kingdom of Kush, whose pyramids can still be found in the region. The Nile River, one of the longest rivers in the world, flows through Sudan, shaping its landscape and providing water for agriculture.
+  </p>
+  <p>
+  The country has diverse cultures, languages, and ethnicities, contributing to its vibrant tapestry of traditions. Arabic is the official language, while Islam is the dominant religion.
+  </p>
+  <p>
+  Sudan faces challenges such as political instability, economic hardships, and conflicts in certain regions. However, efforts are ongoing to address these issues and foster development and peace.
+  </p>
+</div>
+
+Column {data-width=300}
+-----------------------------------------------------------------------
+### Data on inhabitants
+```{r}
+  data <- readRDS(file="data/sudan.RData")
+  knitr::kable(data[1:dim(data)[1],c("sex", "year", "height", "weight")])
+
+```
+Charts
+=======================================================================
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Linear regression
+
+```{r}
+  ui <- fluidPage(
+  titlePanel("Linear Regression of weight on height"),
+  mainPanel(
+    width = 300,
+    height = 1,
+    plotOutput("selectedPlot")
+  )
+)
+
+server <- function(input, output) {
+  output$selectedPlot <- renderPlot({
+    ggplot(data=dta_plot,mapping=aes(x=height,y=weight)) +
+      geom_point() +
+      geom_smooth(method="loess",se=T)
+  })
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+### Scatter Plot
+
+```{r}
+ui <- fluidPage(
+  titlePanel("Scatter plot of the relationship between weight and height"),
+  sidebarLayout(
+    sidebarPanel(
+      h3("Filter Options"),
+      p("Filter data by year and sex"),
+      checkboxGroupInput("yearInput", "Select Year:", 
+                         choices = unique(dta_plot$year),
+                         selected = unique(dta_plot$year)),
+      checkboxGroupInput("sexInput", "Select Sex:",
+                         choices = unique(dta_plot$sex),
+                         selected = unique(dta_plot$sex))
+    ),
+    
+    mainPanel(
+      plotOutput("selectedPlot")
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$selectedPlot <- renderPlot({
+    filteredData <- dta_plot %>% 
+      filter(year %in% input$yearInput, sex %in% input$sexInput)
+    ggplot(data = filteredData, mapping = aes(x = height, y = weight, color = sex)) +
+      geom_point() +
+      labs(x = "Height", y = "Weight")
+  })
+}
+
+shinyApp(ui = ui, server = server)
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+### Density Plot
+
+```{r}
+ui <- fluidPage(
+  titlePanel("Density plot of weight, height and BMI Distribution"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("variable", "Select Variable:", 
+                  choices = c("Weight" = "weight", "Height" = "height","BMI" = "bmi"), selected = "weight"),
+      selectInput("group", "Group by:",
+                  choices = c("Sex" = "sex","Year" = "year"), selected = "sex")
+    ),
+    mainPanel(
+      plotlyOutput("densityPlot")
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$densityPlot <- renderPlotly({
+    data_to_plot <- dta_plot
+    p <- ggplot(data = data_to_plot, aes_string(x = input$variable, fill = input$group)) +
+      geom_density(alpha = 0.6) +
+      labs(title = paste("Density Plot of", input$variable, "by", input$group))
+  })
+}
+  shinyApp(ui = ui, server = server)
+
+
+```
+
+Test
+======
+
+```{r}
+ui <- fluidPage(
+  titlePanel("Data Visualization App"),
+  sidebarLayout(
+    sidebarPanel(
+      checkboxGroupInput("yearInput", "Select Year:", 
+                         choices = unique(dta_plot$year),
+                         selected = unique(dta_plot$year))
+    ),
+    mainPanel(
+      plotOutput("selectedPlot")
+    )
+  )
+)
+
+# Define server logic
+server <- function(input, output) {
+  output$selectedPlot <- renderPlot({
+    filteredData <- dta_plot %>% filter(year %in% input$yearInput)
+    # Determine which plot to render based on the user's selection
+      ggplot(data = filteredData, aes(x = height, y = weight, color = sex))+
+        geom_point() +
+        labs(title = "Scatter Plot of Height vs. Weight by Sex", x = "Height", y = "Weight")
+  })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+```
